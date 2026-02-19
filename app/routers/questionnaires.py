@@ -28,14 +28,14 @@ async def get_current_questionnaire(
 ):
     result = await db.execute(
         select(MonthlyQuestionnaire)
-        .where(MonthlyQuestionnaire.is_active == True)
+        .where(MonthlyQuestionnaire.is_active.is_(True))
         .order_by(MonthlyQuestionnaire.year.desc(), MonthlyQuestionnaire.month.desc())
         .limit(1)
     )
     return result.scalar_one_or_none()
 
 
-@router.post("/{questionnaire_id}/submit", response_model=QuestionnaireSubmitResponse)
+@router.post("/{questionnaire_id}/submit", response_model=QuestionnaireSubmitResponse, status_code=201)
 async def submit_questionnaire(
     questionnaire_id: uuid.UUID,
     req: QuestionnaireSubmitRequest,

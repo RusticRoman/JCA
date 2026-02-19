@@ -16,7 +16,7 @@ async def dispatch_questionnaire(
     """Schedule questionnaire notification for all active students.
     Returns the number of tasks dispatched."""
     result = await db.execute(
-        select(User).where(User.role == UserRole.STUDENT, User.is_active == True)
+        select(User).where(User.role == UserRole.STUDENT, User.is_active.is_(True))
     )
     students = result.scalars().all()
 

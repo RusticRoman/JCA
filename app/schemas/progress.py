@@ -1,14 +1,14 @@
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.progress import AttendanceType
 
 
 class SyncProgressRequest(BaseModel):
     video_id: uuid.UUID
-    last_position_seconds: int
-    total_duration_seconds: int
+    last_position_seconds: int = Field(ge=0)
+    total_duration_seconds: int = Field(ge=1)
     attendance_type: AttendanceType = AttendanceType.RECORDED
 
 

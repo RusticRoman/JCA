@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -16,6 +16,9 @@ class FieldType(str, enum.Enum):
 
 class MonthlyQuestionnaire(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "monthly_questionnaires"
+    __table_args__ = (
+        Index("ix_questionnaire_active_year_month", "is_active", "year", "month"),
+    )
 
     title: Mapped[str] = mapped_column(String(255))
     month: Mapped[int] = mapped_column(Integer)  # 1-12
@@ -23,11 +26,11 @@ class MonthlyQuestionnaire(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(default=True)
 
     fields: Mapped[list["QuestionnaireField"]] = relationship(
-        back_populates="questionnaire", lazy="selectin"
+        back_populates="questionnaire", lazy="selectin", cascade="all, delete-orphan"
     )
 
 
-class QuestionnaireField(UUIDPrimaryKeyMixin, Base):
+class QuestionnaireField(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "questionnaire_fields"
 
     questionnaire_id: Mapped[uuid.UUID] = mapped_column(
@@ -44,6 +47,9 @@ class QuestionnaireField(UUIDPrimaryKeyMixin, Base):
 
 class QuestionnaireResponse(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "questionnaire_responses"
+    __table_args__ = (
+        Index("ix_response_questionnaire_user", "questionnaire_id", "user_id"),
+    )
 
     questionnaire_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("monthly_questionnaires.id")

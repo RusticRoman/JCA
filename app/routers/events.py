@@ -15,10 +15,14 @@ router = APIRouter(prefix="/events", tags=["events"])
 
 @router.get("", response_model=list[EventResponse])
 async def list_events(
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Event).order_by(Event.start_time))
+    result = await db.execute(
+        select(Event).order_by(Event.start_time).offset(skip).limit(min(limit, 100))
+    )
     events = result.scalars().all()
     return [
         EventResponse(

@@ -8,7 +8,7 @@ COPY alembic/ alembic/
 COPY alembic.ini .
 COPY scripts/ scripts/
 
-RUN pip install --no-cache-dir . jinja2
+RUN pip install --no-cache-dir .
 
 EXPOSE 8000
 

@@ -13,7 +13,7 @@ class Program(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     description: Mapped[str] = mapped_column(Text, default="")
     year: Mapped[int] = mapped_column(Integer, default=1)  # 1=standard, 2=advanced/graduate
 
-    semesters: Mapped[list["Semester"]] = relationship(back_populates="program", lazy="selectin")
+    semesters: Mapped[list["Semester"]] = relationship(back_populates="program", lazy="selectin", cascade="all, delete-orphan")
 
 
 class Semester(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -25,7 +25,7 @@ class Semester(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     description: Mapped[str] = mapped_column(Text, default="")
 
     program: Mapped["Program"] = relationship(back_populates="semesters")
-    subjects: Mapped[list["Subject"]] = relationship(back_populates="semester", lazy="selectin")
+    subjects: Mapped[list["Subject"]] = relationship(back_populates="semester", lazy="selectin", cascade="all, delete-orphan")
 
 
 class Subject(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -37,7 +37,7 @@ class Subject(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     order: Mapped[int] = mapped_column(Integer, default=0)
 
     semester: Mapped["Semester"] = relationship(back_populates="subjects")
-    videos: Mapped[list["Video"]] = relationship(back_populates="subject", lazy="selectin")
+    videos: Mapped[list["Video"]] = relationship(back_populates="subject", lazy="selectin", cascade="all, delete-orphan")
 
 
 class Video(UUIDPrimaryKeyMixin, TimestampMixin, Base):

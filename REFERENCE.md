@@ -66,7 +66,6 @@ app/gcp/*              ← imports config
 | `subjects`                | Subject               | 5 subjects per semester              |
 | `videos`                  | Video                 | Video lectures per subject           |
 | `video_progress`          | VideoProgress         | Per-user video watch state           |
-| `subject_completions`     | SubjectCompletion     | Denormalized subject progress        |
 | `quizzes`                 | Quiz                  | Post-video quizzes                   |
 | `questions`               | Question              | Multiple-choice questions            |
 | `quiz_attempts`           | QuizAttempt           | User quiz submissions                |
@@ -121,7 +120,6 @@ class FieldType(str, Enum):
 | Table                  | Columns              | Constraint Name    |
 |------------------------|----------------------|--------------------|
 | `video_progress`       | (user_id, video_id)  | `uq_user_video`   |
-| `subject_completions`  | (user_id, subject_id)| `uq_user_subject`  |
 | `event_registrations`  | (event_id, user_id)  | `uq_event_user`   |
 
 ### 2.4 Indexes
@@ -131,9 +129,9 @@ class FieldType(str, Enum):
 - `users.mentor_id` — index (self-referential FK to `users.id`)
 - `video_progress.user_id` — index
 - `video_progress.video_id` — index
-- `subject_completions.user_id` — index
-- `subject_completions.subject_id` — index
 - `beit_din_cases.student_id` — index
+- `monthly_questionnaires.(is_active, year, month)` — compound index
+- `questionnaire_responses.(questionnaire_id, user_id)` — compound index
 
 ### 2.5 Relationship Loading
 
@@ -157,7 +155,7 @@ class TimestampMixin:
     updated_at: Mapped[datetime]  # server_default=func.now(), onupdate=func.now()
 ```
 
-All models (except Question, QuestionnaireField, Answer) use both mixins.
+All models use both mixins.
 
 ---
 
@@ -253,7 +251,7 @@ All models (except Question, QuestionnaireField, Answer) use both mixins.
     ]
   }
   ```
-- **Response**: QuizAttemptResponse (`score`, `total_questions`, `passed`)
+- **Response** (201): QuizAttemptResponse (`score`, `total_questions`, `passed`)
 
 ### 3.7 Dashboard
 
@@ -289,12 +287,14 @@ All models (except Question, QuestionnaireField, Answer) use both mixins.
 
 #### `GET /dashboard/student/{student_id}`
 - **Auth**: Bearer token (RABBI, TEACHER, ADMIN, or BEIT_DIN)
+- **Authorization**: Rabbis and Teachers can only view their own assigned students (`student.mentor_id == current_user.id`). Admins and Beit Din can view any student.
 - **Response**: Same as above, for the specified student
 
 ### 3.8 Rabbi Portal
 
 #### `GET /rabbi/students`
 - **Auth**: RABBI or ADMIN
+- **Query Params**: `skip` (default 0), `limit` (default 50, max 100)
 - **Response**: UserResponse[] (active students only)
 
 #### `GET /rabbi/students/{student_id}/progress`
@@ -305,6 +305,7 @@ All models (except Question, QuestionnaireField, Answer) use both mixins.
 
 #### `GET /teacher/students`
 - **Auth**: TEACHER or ADMIN
+- **Query Params**: `skip` (default 0), `limit` (default 50, max 100)
 - **Response**: UserResponse[]
 
 #### `GET /teacher/activity`
@@ -315,6 +316,7 @@ All models (except Question, QuestionnaireField, Answer) use both mixins.
 
 #### `GET /beit-din/cases`
 - **Auth**: RABBI, BEIT_DIN, or ADMIN
+- **Query Params**: `skip` (default 0), `limit` (default 50, max 100)
 - **Response**: CaseResponse[]
 
 #### `POST /beit-din/cases`
@@ -359,7 +361,7 @@ All models (except Question, QuestionnaireField, Answer) use both mixins.
 #### `POST /questionnaires/{questionnaire_id}/submit`
 - **Auth**: Bearer token
 - **Request Body**: `{"answers": {"field-uuid": "answer text"}}`
-- **Response**: QuestionnaireSubmitResponse
+- **Response** (201): QuestionnaireSubmitResponse
 
 #### `POST /questionnaires/dispatch?questionnaire_id={uuid}`
 - **Auth**: ADMIN
@@ -370,6 +372,7 @@ All models (except Question, QuestionnaireField, Answer) use both mixins.
 
 #### `GET /resources`
 - **Auth**: Bearer token
+- **Query Params**: `skip` (default 0), `limit` (default 50, max 100)
 - **Response**: ResourceResponse[]
 
 #### `GET /resources/{resource_id}/download`
@@ -380,12 +383,14 @@ All models (except Question, QuestionnaireField, Answer) use both mixins.
 
 #### `GET /events`
 - **Auth**: Bearer token
+- **Query Params**: `skip` (default 0), `limit` (default 50, max 100)
 - **Response**: EventResponse[] (includes `registered_count`)
 
 #### `POST /events/{event_id}/register`
 - **Auth**: Bearer token
 - **Response** (201): EventRegistrationResponse
-- **Side Effect**: Creates Google Calendar event
+- **Side Effect**: Creates Google Calendar event (non-blocking — failure is logged, registration succeeds)
+- **Concurrency**: Uses `SELECT FOR UPDATE` row lock on event to prevent race conditions on capacity check
 - **Errors**: 400 if event is full or already registered
 
 #### `DELETE /events/{event_id}/register`
@@ -397,6 +402,7 @@ All models (except Question, QuestionnaireField, Answer) use both mixins.
 
 #### `GET /faq`
 - **Auth**: None (public)
+- **Query Params**: `skip` (default 0), `limit` (default 50, max 100)
 - **Response**: FAQResponse[] (published only, ordered)
 
 #### `POST /faq`
@@ -409,19 +415,58 @@ All models (except Question, QuestionnaireField, Answer) use both mixins.
 - **Request Body**: `{"question": "...", "answer": "...", "order": 2, "is_published": false}`
 - **Response**: FAQResponse
 
-### 3.15 Web UI Pages (`/pages`)
+### 3.15 Admin (`/admin`)
 
-Server-rendered HTML pages using Jinja2 templates with session-cookie authentication.
+#### `GET /admin/stats`
+- **Auth**: ADMIN
+- **Response**: `{"total_users": 50, "active_students": 35, "total_rabbis": 5, "total_teachers": 3}`
+
+#### `GET /admin/users`
+- **Auth**: ADMIN
+- **Query Params**: `skip` (default 0), `limit` (default 50, max 100), `role` (optional filter)
+- **Response**: UserResponse[]
+
+#### `PATCH /admin/users/{user_id}`
+- **Auth**: ADMIN
+- **Request Body**: `{"role": "TEACHER", "is_active": true, "enrollment_semester": 3}`
+- **Response**: UserResponse
+
+#### `POST /admin/users/{user_id}/deactivate`
+- **Auth**: ADMIN
+- **Response**: UserResponse (with `is_active: false`)
+
+### 3.16 Export (`/export`)
+
+#### `GET /export/progress.csv`
+- **Auth**: ADMIN
+- **Response**: CSV file (Content-Disposition: attachment)
+- **Columns**: user_id, video_id, last_position_seconds, total_duration_seconds, is_completed, attendance_type, created_at
+
+#### `GET /export/users.csv`
+- **Auth**: ADMIN
+- **Response**: CSV file
+- **Columns**: id, email, display_name, role, is_active, enrollment_semester, created_at
+
+#### `GET /export/questionnaire-responses.csv`
+- **Auth**: ADMIN
+- **Response**: CSV file
+- **Columns**: id, questionnaire_id, user_id, answers, created_at
+
+### 3.17 Web UI Pages (`/pages`)
+
+Server-rendered HTML pages using Jinja2 templates with HMAC-signed session cookies and CSRF protection.
 
 #### `GET /pages/login`
-- Renders login form (email/password + Google sign-in placeholder)
+- Renders login form (email/password + Google sign-in placeholder) with CSRF token
 
 #### `POST /pages/login`
-- Authenticates user, creates session cookie
+- Validates CSRF token, authenticates user (generic "Invalid email or password" error to prevent enumeration)
+- Creates session cookie (httponly, SameSite=Lax)
 - **Redirect**: RABBI/TEACHER/ADMIN → `/pages/mentor-dashboard`; STUDENT → `/pages/dashboard`
 
 #### `GET /pages/register` / `POST /pages/register`
-- Registration form; creates user with hashed password (`local:salt:hash` in `firebase_uid`)
+- Registration form with CSRF token; validates display name (1-100 chars), email format, password length (8+)
+- Creates user with scrypt-hashed password (`local:salt:hash` in `firebase_uid`)
 - Auto-assigns new students to first available RABBI mentor
 - Auto-login after registration → redirect to dashboard
 
@@ -489,9 +534,10 @@ Server-rendered HTML pages using Jinja2 templates with session-cookie authentica
 ### 4.4 Event Service (`app/services/event_service.py`)
 
 **`register_for_event(db, event_id, user)`**
+- Uses `SELECT FOR UPDATE` to lock event row (prevents race conditions on capacity)
 - Checks capacity (if > 0)
 - Prevents duplicate registration
-- Creates Google Calendar event
+- Flushes registration, then attempts Google Calendar event creation (non-blocking — failure is logged but does not rollback)
 - Returns: EventRegistration
 
 **`unregister_from_event(db, event_id, user_id)`**
@@ -515,13 +561,7 @@ Provides async function stubs for integration with an email provider:
 
 Currently logs to the Python logger. Replace with SendGrid/Mailgun/Gmail API in production.
 
-### 4.7 Curriculum Service (`app/services/curriculum_service.py`)
-
-**`get_accessible_semesters(db, user)`**
-- Returns semesters where `program.year <= user.program_year`
-- Used for 2nd-year/graduate content gating
-
-### 4.8 Resource Service (`app/services/resource_service.py`)
+### 4.7 Resource Service (`app/services/resource_service.py`)
 
 **`get_download_url(gcs_path)`**
 - Generates a signed GCS URL for resource download
@@ -572,16 +612,19 @@ async def admin_endpoint(
 - `get_video_url(gcs_path)` — shortcut for video bucket
 - `get_resource_url(gcs_path)` — shortcut for resource bucket
 - **Dev mode**: Returns placeholder URL `https://storage.googleapis.com/{bucket}/{path}?dev=true`
+- **Error handling**: All GCP calls wrapped in try/except with `logger.exception()` — errors are logged and re-raised
 
 ### 6.2 Cloud Tasks (`app/gcp/cloud_tasks.py`)
 
 - `create_task(url, payload, delay_seconds=0)` — creates an HTTP POST task
 - **Dev mode**: Returns `f"dev-task-{url}"` without making any API call
+- **Error handling**: Logs and re-raises on failure
 
 ### 6.3 Calendar Sync (`app/gcp/calendar_sync.py`)
 
 - `create_calendar_event(title, description, start_time, end_time, location, attendee_email)` — creates a Google Calendar event via service account
 - **Dev mode**: Returns `f"dev-calendar-event-{title}"`
+- **Error handling**: Logs and re-raises on failure. Event registration catches this exception to avoid blocking the registration.
 
 ---
 
@@ -596,7 +639,7 @@ async def admin_endpoint(
   - `student_user`, `rabbi_user`, `teacher_user`, `beit_din_user`, `admin_user` — pre-created users with specific roles
   - `client` — httpx AsyncClient with student user, dependencies overridden
   - `make_client` — factory to create client with any user
-- **Factories** (`tests/factories.py`): `make_user`, `make_program`, `make_semester`, `make_subject`, `make_video`
+- **Factories** (`tests/factories.py`): `make_user`, `make_program`, `make_semester`, `make_subject`, `make_video`, `make_quiz`, `make_question`, `make_event`, `make_case`, `make_questionnaire`, `make_resource`, `make_faq`
 - **Dependency overrides**: `_override_deps(app, db_session, user)` replaces `get_db` and `get_current_user` for test isolation
 
 ### 7.2 Test Inventory
@@ -616,6 +659,25 @@ async def admin_endpoint(
 | `test_biet_din_access` | Student gets 403 on `/beit-din/cases`; Rabbi gets 200 |
 | `test_monthly_questionnaire_dispatch` | Cloud Tasks `create_task` is called for each active student |
 | `test_retreat_signup_calendar` | Event registration calls `create_calendar_event` with correct title |
+
+#### Router Tests (`tests/routers/`)
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `test_health.py` | 1 | Health endpoint |
+| `test_users.py` | 2 | Profile read/update |
+| `test_curriculum.py` | 4 | Programs, semesters, subjects, videos (including 404s) |
+| `test_video_progress.py` | 5 | Sync, completion, resume, validation |
+| `test_assessments.py` | 6 | Quiz get, submit (correct/partial/failing), 404, validation |
+| `test_events.py` | 5 | List, register, unregister, capacity, duplicate |
+| `test_beit_din.py` | 6 | Cases CRUD, notes, access control |
+| `test_questionnaires.py` | 5 | Current, submit, dispatch, 404, access control |
+| `test_resources.py` | 3 | List, download, 404 |
+| `test_faq.py` | 5 | List (published filter), create, update, 404, access control |
+| `test_dashboard.py` | 3 | Own dashboard, rabbi view (mentor auth), student forbidden |
+| `test_rabbi_teacher.py` | 5 | Student list, access control, teacher activity |
+| `test_admin.py` | 7 | Stats, list users, filter by role, update, deactivate, 403, 404 |
+| `test_export.py` | 4 | CSV progress, users, questionnaires, 403 |
 
 ### 7.3 Running Tests
 
@@ -687,27 +749,27 @@ alembic history
 
 ### Core Application
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `app/main.py` | 48 | App factory, CORS, router registration |
-| `app/config.py` | 27 | Pydantic Settings |
-| `app/dependencies.py` | 59 | `get_db`, `get_current_user` |
+| File | Purpose |
+|------|---------|
+| `app/main.py` | App factory, CORS, security headers, logging middleware, 17 router registrations |
+| `app/config.py` | Pydantic Settings |
+| `app/dependencies.py` | `get_db`, `get_current_user` |
 
 ### Auth
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `app/auth/firebase.py` | 35 | Firebase init, `verify_token()` |
-| `app/auth/middleware.py` | 22 | `require_roles()` dependency factory |
+| File | Purpose |
+|------|---------|
+| `app/auth/firebase.py` | Firebase init, `verify_token()` |
+| `app/auth/middleware.py` | `require_roles()` dependency factory |
 
-### Models (17 model classes)
+### Models (16 model classes)
 
 | File | Models | Table(s) |
 |------|--------|----------|
 | `app/models/base.py` | Base, UUIDPrimaryKeyMixin, TimestampMixin | — |
 | `app/models/user.py` | User, UserRole | `users` (self-ref `mentor_id` FK) |
 | `app/models/curriculum.py` | Program, Semester, Subject, Video | `programs`, `semesters`, `subjects`, `videos` |
-| `app/models/progress.py` | VideoProgress, SubjectCompletion, AttendanceType | `video_progress`, `subject_completions` |
+| `app/models/progress.py` | VideoProgress, AttendanceType | `video_progress` |
 | `app/models/assessment.py` | Quiz, Question, QuizAttempt, Answer | `quizzes`, `questions`, `quiz_attempts`, `answers` |
 | `app/models/beit_din.py` | Case, CaseNote, CaseDocument, CaseStatus | `beit_din_cases`, `case_notes`, `case_documents` |
 | `app/models/questionnaire.py` | MonthlyQuestionnaire, QuestionnaireField, QuestionnaireResponse | `monthly_questionnaires`, `questionnaire_fields`, `questionnaire_responses` |
@@ -728,7 +790,7 @@ alembic history
 | `app/schemas/resource.py` | ResourceResponse, ResourceDownloadResponse |
 | `app/schemas/event.py` | EventResponse, EventRegistrationResponse |
 
-### Routers (15 routers, 45+ endpoints)
+### Routers (17 routers, 50+ endpoints)
 
 | File | Prefix | Endpoints |
 |------|--------|-----------|
@@ -737,31 +799,32 @@ alembic history
 | `app/routers/users.py` | `/users` | GET /me, PATCH /me |
 | `app/routers/curriculum.py` | `/curriculum` | GET /programs, /semesters/{id}, /subjects/{id}, /videos/{id} |
 | `app/routers/video_progress.py` | `/progress` | POST /sync-progress, GET /video-state/{id} |
-| `app/routers/assessments.py` | `/quizzes` | GET /{id}, POST /{id}/submit |
-| `app/routers/dashboard.py` | `/dashboard` | GET /, GET /student/{id} |
-| `app/routers/rabbi.py` | `/rabbi` | GET /students, GET /students/{id}/progress |
-| `app/routers/teacher.py` | `/teacher` | GET /students, GET /activity |
-| `app/routers/beit_din.py` | `/beit-din` | GET /cases, POST /cases, GET /cases/{id}, PATCH /cases/{id}, POST /cases/{id}/notes |
-| `app/routers/questionnaires.py` | `/questionnaires` | GET /current, POST /{id}/submit, POST /dispatch |
-| `app/routers/resources.py` | `/resources` | GET /, GET /{id}/download |
-| `app/routers/events.py` | `/events` | GET /, POST /{id}/register, DELETE /{id}/register |
-| `app/routers/faq.py` | `/faq` | GET /, POST /, PATCH /{id} |
-| `app/routers/pages.py` | `/pages` | GET/POST /login, GET/POST /register, GET /dashboard, GET /mentor-dashboard, GET /mentor/student/{id}, GET /logout |
+| `app/routers/assessments.py` | `/quizzes` | GET /{id}, POST /{id}/submit (201) |
+| `app/routers/dashboard.py` | `/dashboard` | GET /, GET /student/{id} (mentor auth) |
+| `app/routers/rabbi.py` | `/rabbi` | GET /students (paginated), GET /students/{id}/progress |
+| `app/routers/teacher.py` | `/teacher` | GET /students (paginated), GET /activity |
+| `app/routers/beit_din.py` | `/beit-din` | GET /cases (paginated), POST /cases, GET /cases/{id}, PATCH /cases/{id}, POST /cases/{id}/notes |
+| `app/routers/questionnaires.py` | `/questionnaires` | GET /current, POST /{id}/submit (201), POST /dispatch |
+| `app/routers/resources.py` | `/resources` | GET / (paginated), GET /{id}/download |
+| `app/routers/events.py` | `/events` | GET / (paginated), POST /{id}/register (row lock), DELETE /{id}/register |
+| `app/routers/faq.py` | `/faq` | GET / (paginated), POST /, PATCH /{id} |
+| `app/routers/admin.py` | `/admin` | GET /stats, GET /users (paginated), PATCH /users/{id}, POST /users/{id}/deactivate |
+| `app/routers/export.py` | `/export` | GET /progress.csv, GET /users.csv, GET /questionnaire-responses.csv |
+| `app/routers/pages.py` | `/pages` | GET/POST /login (CSRF), GET/POST /register (CSRF), GET /dashboard, GET /mentor-dashboard, GET /mentor/student/{id}, GET /logout |
 
-### Services (14 functions)
+### Services (12 functions)
 
 | File | Functions |
 |------|-----------|
 | `app/services/progress_service.py` | `sync_progress`, `get_video_state` |
 | `app/services/assessment_service.py` | `get_quiz`, `grade_quiz` |
 | `app/services/beit_din_service.py` | `create_case`, `update_case_status`, `add_note` |
-| `app/services/event_service.py` | `register_for_event`, `unregister_from_event` |
+| `app/services/event_service.py` | `register_for_event` (with row lock + non-blocking calendar), `unregister_from_event` |
 | `app/services/cloud_tasks_service.py` | `dispatch_questionnaire` |
 | `app/services/resource_service.py` | `get_download_url` |
 | `app/services/email_service.py` | `send_welcome_email`, `send_questionnaire_reminder`, `send_event_confirmation`, `send_beit_din_update` |
-| `app/services/curriculum_service.py` | `get_accessible_semesters` |
 
-### GCP Wrappers
+### GCP Wrappers (all with error logging)
 
 | File | Functions |
 |------|-----------|
@@ -784,14 +847,35 @@ alembic history
 
 | File | Description |
 |------|-------------|
-| `scripts/seed_curriculum.py` | Loads 8 semesters x 5 subjects with sample 45-min videos |
+| `scripts/seed_curriculum.py` | Idempotent: loads 8 semesters x 5 subjects with sample 45-min videos (skips if already seeded) |
 | `scripts/seed_mentor.py` | Creates 2 mentor accounts, 10 synthetic students, assigns to mentors, generates progress data |
 
-### Tests
+### Tests (74 tests)
 
-| File | Functions |
-|------|-----------|
-| `tests/conftest.py` | 9 fixtures + `_override_deps` helper |
-| `tests/factories.py` | 5 factory functions |
-| `tests/unit/test_tracking.py` | 3 unit tests |
-| `tests/integration/test_portals.py` | 3 integration tests |
+| File | Tests | Description |
+|------|-------|-------------|
+| `tests/conftest.py` | — | 9 fixtures + `_override_deps` helper |
+| `tests/factories.py` | — | 12 factory functions |
+| `tests/unit/test_tracking.py` | 3 | Progress save, resume, attendance differentiation |
+| `tests/integration/test_portals.py` | 3 | Beit din access, questionnaire dispatch, calendar sync |
+| `tests/routers/test_health.py` | 1 | Health endpoint |
+| `tests/routers/test_users.py` | 2 | Profile read/update |
+| `tests/routers/test_curriculum.py` | 4 | Curriculum CRUD + 404s |
+| `tests/routers/test_video_progress.py` | 5 | Sync, completion, resume, validation |
+| `tests/routers/test_assessments.py` | 6 | Quiz get/submit/validation |
+| `tests/routers/test_events.py` | 5 | Event registration lifecycle |
+| `tests/routers/test_beit_din.py` | 6 | Cases CRUD + notes + access |
+| `tests/routers/test_questionnaires.py` | 5 | Questionnaire lifecycle + access |
+| `tests/routers/test_resources.py` | 3 | List, download, 404 |
+| `tests/routers/test_faq.py` | 5 | FAQ CRUD + published filter + access |
+| `tests/routers/test_dashboard.py` | 3 | Dashboard views + mentor auth |
+| `tests/routers/test_rabbi_teacher.py` | 5 | Portal access + activity |
+| `tests/routers/test_admin.py` | 7 | Stats, CRUD, filters, access |
+| `tests/routers/test_export.py` | 4 | CSV exports + access |
+
+### Migrations
+
+| File | Description |
+|------|-------------|
+| `alembic/env.py` | Async Alembic env with DATABASE_URL override |
+| `alembic/versions/7860d8a96b01_baseline.py` | Baseline migration: all 20 tables with indexes and constraints |

@@ -2,10 +2,9 @@
 set -e
 
 echo "Running migrations..."
-alembic upgrade head 2>/dev/null || echo "No migrations to run, creating tables directly..."
-
-echo "Ensuring tables exist..."
-python -c "
+if ! alembic upgrade head; then
+    echo "Migrations failed — falling back to create_all..."
+    python -c "
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine
 from app.models import Base
@@ -20,12 +19,13 @@ async def init():
 
 asyncio.run(init())
 "
+fi
 
 echo "Seeding curriculum..."
-python scripts/seed_curriculum.py 2>/dev/null || echo "Curriculum already seeded."
+python scripts/seed_curriculum.py || echo "WARNING: Curriculum seeding failed"
 
 echo "Seeding mentor..."
-python scripts/seed_mentor.py 2>/dev/null || echo "Mentor already seeded."
+python scripts/seed_mentor.py || echo "WARNING: Mentor seeding failed"
 
 echo "Starting server..."
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000

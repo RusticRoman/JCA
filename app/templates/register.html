@@ -15,6 +15,7 @@
     {% endif %}
 
     <form method="post" action="/pages/register">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="form-group">
             <label for="display_name">Full Name</label>
             <input type="text" id="display_name" name="display_name" required placeholder="Your full name" autocomplete="name">

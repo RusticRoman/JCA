@@ -36,10 +36,10 @@ class FAQUpdateRequest(BaseModel):
 
 
 @router.get("", response_model=list[FAQResponse])
-async def list_faqs(db: AsyncSession = Depends(get_db)):
+async def list_faqs(skip: int = 0, limit: int = 50, db: AsyncSession = Depends(get_db)):
     """Public endpoint - no auth required."""
     result = await db.execute(
-        select(FAQ).where(FAQ.is_published == True).order_by(FAQ.order)
+        select(FAQ).where(FAQ.is_published.is_(True)).order_by(FAQ.order).offset(skip).limit(min(limit, 100))
     )
     return result.scalars().all()
 

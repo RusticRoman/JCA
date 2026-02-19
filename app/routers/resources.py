@@ -15,10 +15,14 @@ router = APIRouter(prefix="/resources", tags=["resources"])
 
 @router.get("", response_model=list[ResourceResponse])
 async def list_resources(
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Resource).order_by(Resource.created_at.desc()))
+    result = await db.execute(
+        select(Resource).order_by(Resource.created_at.desc()).offset(skip).limit(min(limit, 100))
+    )
     return result.scalars().all()
 
 

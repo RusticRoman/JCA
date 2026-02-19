@@ -8,7 +8,7 @@ from app.models.user import UserRole
 
 class RegisterRequest(BaseModel):
     firebase_uid: str
-    email: str
+    email: EmailStr
     display_name: str = ""
 
 

@@ -13,10 +13,10 @@ class Quiz(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(255))
     passing_score: Mapped[int] = mapped_column(Integer, default=70)
 
-    questions: Mapped[list["Question"]] = relationship(back_populates="quiz", lazy="selectin")
+    questions: Mapped[list["Question"]] = relationship(back_populates="quiz", lazy="selectin", cascade="all, delete-orphan")
 
 
-class Question(UUIDPrimaryKeyMixin, Base):
+class Question(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "questions"
 
     quiz_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("quizzes.id"))
@@ -40,10 +40,10 @@ class QuizAttempt(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     total_questions: Mapped[int] = mapped_column(Integer, default=0)
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    answers: Mapped[list["Answer"]] = relationship(back_populates="attempt", lazy="selectin")
+    answers: Mapped[list["Answer"]] = relationship(back_populates="attempt", lazy="selectin", cascade="all, delete-orphan")
 
 
-class Answer(UUIDPrimaryKeyMixin, Base):
+class Answer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "answers"
 
     attempt_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("quiz_attempts.id"))

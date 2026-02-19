@@ -135,9 +135,8 @@ This document records the implementation plan that was executed to build the JCA
 **Files created:**
 - `app/routers/faq.py` — public GET, admin POST/PATCH
 - `app/services/email_service.py` — logging stubs for welcome, reminder, confirmation, update emails
-- `app/services/curriculum_service.py` — `get_accessible_semesters()` for program year gating
 
-**Final verification:** All 6 tests pass, 38 routes registered, app loads cleanly.
+**Verification:** All 6 tests pass, 38 routes registered, app loads cleanly.
 
 ### Step 11: Web UI — Login, Registration, Dashboards + Mentor Feature
 
@@ -168,22 +167,94 @@ This document records the implementation plan that was executed to build the JCA
 - `mentor@jca.org` / `mentor123` — Rabbi David Cohen (6 students)
 - `mentor2@jca.org` / `mentor456` — Rabbi Sarah Levy (4 students)
 
+### Step 12: Improvement Round 1 — Code Quality & Testing
+
+21 improvements applied from automated audit:
+
+**Bug fixes:**
+- Fixed `db.delete()` in event_service.py to use SQLAlchemy `delete()` statement
+- Fixed `== True` to `.is_(True)` in 5 files
+- Fixed quiz title via JOIN in dashboard
+- Fixed N+1 queries in pages.py mentor dashboard (bulk count query)
+
+**Security:**
+- SHA-256 replaced with scrypt password hashing + hmac.compare_digest
+- In-memory sessions replaced with HMAC-signed cookie sessions
+- Added auth to curriculum endpoints
+
+**Code quality:**
+- Added cascade deletes to all parent-child relationships
+- Added input validation (EmailStr, Field constraints, Literal["A","B","C","D"])
+- Added TimestampMixin to Question, Answer, QuestionnaireField
+- Added compound indexes on questionnaire
+- Added application logging middleware
+- Pinned all dependency versions with upper bounds
+
+**Infrastructure:**
+- Created .dockerignore
+- Added GitHub Actions CI pipeline
+- Added restart policy and healthcheck to docker-compose
+- Fixed start.sh error handling
+- Added jinja2 to pyproject.toml dependencies
+
+**Testing:**
+- Expanded test suite from 6 to 63 tests (10 new test files)
+- Added factory functions for all model types
+
+**Verification:** All 63 tests pass in 3.24s.
+
+### Step 13: Improvement Round 2 — Security, Features & Polish
+
+19 additional improvements applied:
+
+**Security:**
+- Fixed user enumeration on login (generic "Invalid email or password" error)
+- Added CSRF protection (HMAC-signed tokens on login/register forms)
+- Added SameSite=Lax cookie flag on all session cookies
+- Added security headers middleware (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy)
+- Restricted CORS config (specific methods/headers instead of wildcards)
+- Added register form validation (display name length, email format, normalization)
+
+**Bug fixes:**
+- Fixed dashboard mentor authorization (rabbis/teachers can only view assigned students)
+- Fixed event registration race condition (SELECT FOR UPDATE row lock)
+- Fixed transaction safety (calendar failures no longer rollback registration)
+- Fixed inline imports in dashboard.py
+- Fixed status code inconsistencies (quiz/questionnaire submit now return 201)
+
+**Code quality:**
+- Added GCP error handling (try/except + logging in all 3 GCP wrappers)
+- Added pagination (skip/limit) to 6 list endpoints
+- Removed SubjectCompletion dead code from progress.py
+- Removed unused curriculum_service.py (get_accessible_semesters)
+- Made seed scripts idempotent (existence check before insert)
+
+**New features:**
+- Admin interface: stats, user listing (with role filter), update, deactivate
+- Data export: CSV export for progress, users, questionnaire responses
+- Alembic baseline migration for all 20 tables
+
+**Testing:**
+- Expanded from 63 to 74 tests (new admin + export tests, updated existing)
+
+**Verification:** All 74 tests pass in 3.73s.
+
 ---
 
 ## Final Statistics
 
 | Metric              | Value     |
 |---------------------|-----------|
-| Python files        | 70+       |
-| Total lines of code | ~3,500    |
-| SQLAlchemy models   | 17        |
-| Pydantic schemas    | 27        |
-| API routers         | 15        |
-| API endpoints       | 45+       |
-| Service functions   | 14        |
-| Database tables     | 17        |
+| Python files        | 80+       |
+| Total lines of code | ~4,500    |
+| SQLAlchemy models   | 16        |
+| Pydantic schemas    | 30+       |
+| API routers         | 17        |
+| API endpoints       | 50+       |
+| Service functions   | 12        |
+| Database tables     | 20        |
 | Jinja2 templates    | 6         |
 | Seed scripts        | 2         |
 | Unit tests          | 3         |
-| Integration tests   | 3         |
-| All tests passing   | Yes (6/6) |
+| Integration tests   | 71        |
+| All tests passing   | Yes (74)  |

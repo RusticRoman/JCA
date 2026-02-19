@@ -1,5 +1,8 @@
 import hashlib
+import hmac
+import json
 import secrets
+import time
 import uuid
 
 from fastapi import APIRouter, Cookie, Depends, Form, Request
@@ -7,6 +10,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from sqlalchemy import func as sa_func
 
 from app.dependencies import get_db
 from app.models.curriculum import Program, Video
@@ -18,27 +23,76 @@ templates = Jinja2Templates(directory="app/templates")
 router = APIRouter(prefix="/pages", tags=["pages"])
 root_router = APIRouter(tags=["root"])
 
-# Simple in-memory session store (use Redis in production)
-_sessions: dict[str, uuid.UUID] = {}
+# HMAC-signed cookie sessions (no server-side state).
+# Replace _SESSION_SECRET via env var in production.
+_SESSION_SECRET = secrets.token_bytes(32)
+_SESSION_MAX_AGE = 86400  # 24 hours
+_CSRF_MAX_AGE = 3600  # 1 hour
+
+
+def _generate_csrf_token() -> str:
+    payload = json.dumps({"nonce": secrets.token_hex(16), "exp": int(time.time()) + _CSRF_MAX_AGE})
+    sig = hmac.new(_SESSION_SECRET, payload.encode(), "sha256").hexdigest()
+    return f"{payload}|{sig}"
+
+
+def _validate_csrf_token(token: str | None) -> bool:
+    if not token or "|" not in token:
+        return False
+    payload, sig = token.rsplit("|", 1)
+    expected = hmac.new(_SESSION_SECRET, payload.encode(), "sha256").hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return False
+    try:
+        data = json.loads(payload)
+        return data.get("exp", 0) >= time.time()
+    except (json.JSONDecodeError, KeyError):
+        return False
+
+
+def _create_session_token(user_id: uuid.UUID) -> str:
+    payload = json.dumps({"uid": str(user_id), "exp": int(time.time()) + _SESSION_MAX_AGE})
+    sig = hmac.new(_SESSION_SECRET, payload.encode(), "sha256").hexdigest()
+    return f"{payload}|{sig}"
+
+
+def _verify_session_token(token: str) -> uuid.UUID | None:
+    if not token or "|" not in token:
+        return None
+    payload, sig = token.rsplit("|", 1)
+    expected = hmac.new(_SESSION_SECRET, payload.encode(), "sha256").hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return None
+    try:
+        data = json.loads(payload)
+        if data.get("exp", 0) < time.time():
+            return None
+        return uuid.UUID(data["uid"])
+    except (json.JSONDecodeError, KeyError, ValueError):
+        return None
 
 
 def _hash_password(password: str, salt: str = "") -> tuple[str, str]:
     if not salt:
         salt = secrets.token_hex(16)
-    hashed = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+    hashed = hashlib.scrypt(
+        password.encode(), salt=salt.encode(), n=16384, r=8, p=1, dklen=64
+    ).hex()
     return f"{salt}:{hashed}", salt
 
 
 def _verify_password(password: str, stored: str) -> bool:
     salt, expected_hash = stored.split(":", 1)
-    actual = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
-    return actual == expected_hash
+    actual = hashlib.scrypt(
+        password.encode(), salt=salt.encode(), n=16384, r=8, p=1, dklen=64
+    ).hex()
+    return hmac.compare_digest(actual, expected_hash)
 
 
 async def _get_session_user(db: AsyncSession, session_id: str | None) -> User | None:
-    if not session_id or session_id not in _sessions:
+    user_id = _verify_session_token(session_id)
+    if not user_id:
         return None
-    user_id = _sessions[session_id]
     result = await db.execute(select(User).where(User.id == user_id))
     return result.scalar_one_or_none()
 
@@ -54,7 +108,9 @@ async def root_redirect():
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request, "error": ""})
+    return templates.TemplateResponse("login.html", {
+        "request": request, "error": "", "csrf_token": _generate_csrf_token(),
+    })
 
 
 @router.post("/login")
@@ -62,36 +118,36 @@ async def login_submit(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    csrf_token: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    if not _validate_csrf_token(csrf_token):
+        return templates.TemplateResponse("login.html", {
+            "request": request, "error": "Form expired. Please try again.",
+            "csrf_token": _generate_csrf_token(),
+        })
+
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
-    if not user:
+    if not user or not user.firebase_uid.startswith("local:"):
         return templates.TemplateResponse("login.html", {
-            "request": request,
-            "error": "No account found with that email address.",
-        })
-
-    if not user.firebase_uid.startswith("local:"):
-        return templates.TemplateResponse("login.html", {
-            "request": request,
-            "error": "This account uses Firebase sign-in. Please use Google sign-in.",
+            "request": request, "error": "Invalid email or password.",
+            "csrf_token": _generate_csrf_token(),
         })
 
     stored_password = user.firebase_uid.removeprefix("local:")
     if not _verify_password(password, stored_password):
         return templates.TemplateResponse("login.html", {
-            "request": request,
-            "error": "Incorrect password.",
+            "request": request, "error": "Invalid email or password.",
+            "csrf_token": _generate_csrf_token(),
         })
 
     # Create session and redirect based on role
-    session_id = secrets.token_urlsafe(32)
-    _sessions[session_id] = user.id
+    token = _create_session_token(user.id)
     dest = "/pages/mentor-dashboard" if user.role in (UserRole.RABBI, UserRole.TEACHER, UserRole.ADMIN) else "/pages/dashboard"
     response = RedirectResponse(url=dest, status_code=303)
-    response.set_cookie(key="session", value=session_id, httponly=True, max_age=86400)
+    response.set_cookie(key="session", value=token, httponly=True, max_age=_SESSION_MAX_AGE, samesite="lax")
     return response
 
 
@@ -101,6 +157,7 @@ async def login_submit(
 async def register_page(request: Request, error: str = "", success: str = ""):
     return templates.TemplateResponse("register.html", {
         "request": request, "error": error, "success": success,
+        "csrf_token": _generate_csrf_token(),
     })
 
 
@@ -111,22 +168,49 @@ async def register_submit(
     email: str = Form(...),
     password: str = Form(...),
     password_confirm: str = Form(...),
+    csrf_token: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    import re
+
+    if not _validate_csrf_token(csrf_token):
+        return templates.TemplateResponse("register.html", {
+            "request": request, "error": "Form expired. Please try again.", "success": "",
+            "csrf_token": _generate_csrf_token(),
+        })
+
+    # Input validation
+    display_name = display_name.strip()
+    email = email.strip().lower()
+    if not display_name or len(display_name) > 100:
+        return templates.TemplateResponse("register.html", {
+            "request": request, "error": "Display name must be 1-100 characters.", "success": "",
+            "csrf_token": _generate_csrf_token(),
+        })
+
+    if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email) or len(email) > 255:
+        return templates.TemplateResponse("register.html", {
+            "request": request, "error": "Please enter a valid email address.", "success": "",
+            "csrf_token": _generate_csrf_token(),
+        })
+
     if password != password_confirm:
         return templates.TemplateResponse("register.html", {
             "request": request, "error": "Passwords do not match.", "success": "",
+            "csrf_token": _generate_csrf_token(),
         })
 
     if len(password) < 8:
         return templates.TemplateResponse("register.html", {
             "request": request, "error": "Password must be at least 8 characters.", "success": "",
+            "csrf_token": _generate_csrf_token(),
         })
 
     existing = await db.execute(select(User).where(User.email == email))
     if existing.scalar_one_or_none():
         return templates.TemplateResponse("register.html", {
             "request": request, "error": "An account with that email already exists.", "success": "",
+            "csrf_token": _generate_csrf_token(),
         })
 
     hashed, _ = _hash_password(password)
@@ -148,10 +232,9 @@ async def register_submit(
     await db.refresh(user)
 
     # Auto-login after registration
-    session_id = secrets.token_urlsafe(32)
-    _sessions[session_id] = user.id
+    token = _create_session_token(user.id)
     response = RedirectResponse(url="/pages/dashboard", status_code=303)
-    response.set_cookie(key="session", value=session_id, httponly=True, max_age=86400)
+    response.set_cookie(key="session", value=token, httponly=True, max_age=_SESSION_MAX_AGE, samesite="lax")
     return response
 
 
@@ -217,23 +300,24 @@ async def mentor_dashboard_page(
     students = result.scalars().all()
 
     # Total videos for percentage calculation
-    programs_result = await db.execute(select(Program))
-    programs = programs_result.scalars().all()
-    total_videos = 0
-    for program in programs:
-        for semester in program.semesters:
-            for subject in semester.subjects:
-                total_videos += len(subject.videos)
+    total_videos_result = await db.execute(select(sa_func.count(Video.id)))
+    total_videos = total_videos_result.scalar() or 0
 
-    # Enrich each student with their completion stats
+    # Bulk-fetch completion counts for all students in one query
+    student_ids = [s.id for s in students]
+    completion_counts: dict[uuid.UUID, int] = {}
+    if student_ids:
+        counts_result = await db.execute(
+            select(VideoProgress.user_id, sa_func.count(VideoProgress.id))
+            .where(VideoProgress.user_id.in_(student_ids), VideoProgress.is_completed.is_(True))
+            .group_by(VideoProgress.user_id)
+        )
+        completion_counts = dict(counts_result.all())
+
     student_data = []
     total_completed_all = 0
     for s in students:
-        prog_result = await db.execute(
-            select(VideoProgress).where(VideoProgress.user_id == s.id)
-        )
-        progress = prog_result.scalars().all()
-        completed = sum(1 for p in progress if p.is_completed)
+        completed = completion_counts.get(s.id, 0)
         total_completed_all += completed
         pct = round(completed / total_videos * 100, 1) if total_videos > 0 else 0
         student_data.append({
@@ -378,8 +462,6 @@ async def mentor_student_detail(
 
 @router.get("/logout")
 async def logout(session: str | None = Cookie(None)):
-    if session and session in _sessions:
-        del _sessions[session]
     response = RedirectResponse(url="/pages/login", status_code=303)
     response.delete_cookie("session")
     return response

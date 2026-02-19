@@ -61,10 +61,6 @@ Routers (HTTP) → Services (Business Logic) → Models (Data)
 - `last_position_seconds`, `total_duration_seconds`
 - `is_completed` (bool), `attendance_type` enum: **LIVE | RECORDED**
 
-**SubjectCompletion** (`subject_completions`)
-- Denormalized for fast dashboard reads
-- `videos_completed`, `videos_total`, `is_completed`
-
 ### 2.4 Assessment Domain
 
 **Quiz** → **Question** (multiple choice A/B/C/D)
@@ -139,7 +135,7 @@ Once `attendance_type` is set to `LIVE`, it **cannot** be overwritten by `RECORD
 | RABBI      | All student access + student list, progress views, Beit Din cases   |
 | TEACHER    | All student access + student list, activity feed                    |
 | BEIT_DIN   | Beit Din case management                                           |
-| ADMIN      | Everything + FAQ management, questionnaire dispatch                 |
+| ADMIN      | Everything + user management, data export, FAQ management, questionnaire dispatch |
 
 Enforced via `require_roles()` FastAPI dependency factory in `app/auth/middleware.py`.
 
@@ -233,6 +229,21 @@ Enforced via `require_roles()` FastAPI dependency factory in `app/auth/middlewar
 | POST   | `/faq`                            | Create FAQ (ADMIN)             |
 | PATCH  | `/faq/{id}`                       | Update FAQ (ADMIN)             |
 
+### Admin (ADMIN)
+| Method | Path                              | Description                    |
+|--------|-----------------------------------|--------------------------------|
+| GET    | `/admin/stats`                    | Platform statistics            |
+| GET    | `/admin/users`                    | List users (filterable by role, paginated) |
+| PATCH  | `/admin/users/{id}`               | Update user role/status        |
+| POST   | `/admin/users/{id}/deactivate`    | Deactivate user                |
+
+### Export (ADMIN)
+| Method | Path                              | Description                    |
+|--------|-----------------------------------|--------------------------------|
+| GET    | `/export/progress.csv`            | CSV export of all progress     |
+| GET    | `/export/users.csv`               | CSV export of all users        |
+| GET    | `/export/questionnaire-responses.csv` | CSV export of responses    |
+
 ### Web UI Pages (session-cookie auth)
 | Method | Path                              | Description                    |
 |--------|-----------------------------------|--------------------------------|
@@ -273,11 +284,19 @@ Enforced via `require_roles()` FastAPI dependency factory in `app/auth/middlewar
 - [x] **User Dashboards:** Progress tracking per semester/subject/video
 - [x] **Role-Based Portals:** Rabbi, Teacher, Beit Din with access control
 - [x] **Mentor Dashboard:** Self-referential mentor_id assignment, mentor sees only their students, per-video progress dots, activity feed
-- [x] **Web UI:** Server-rendered login/register/dashboard pages with session-cookie auth, role-based redirect, auto mentor assignment
+- [x] **Web UI:** Server-rendered login/register/dashboard pages with HMAC session cookies, CSRF protection, role-based redirect, auto mentor assignment
 - [x] **Beit Din Case Management:** Full CRUD with notes and documents
-- [x] **Advanced Programs:** `program_year` field gates 2nd-year/graduate content
 - [x] **Resource Center:** PDF distribution via signed GCS URLs
-- [x] **Event System:** Registration with capacity checks and calendar sync
-- [x] **FAQ:** Public read, admin write
+- [x] **Event System:** Registration with SELECT FOR UPDATE locking, capacity checks, and calendar sync (non-blocking on failure)
+- [x] **FAQ:** Public read (paginated), admin write
+- [x] **Admin Interface:** Platform stats, user management, role assignment, deactivation
+- [x] **Data Export:** CSV export for progress, users, questionnaire responses (ADMIN only)
 - [x] **Email Service:** Interface for welcome, reminder, confirmation emails
 - [x] **Cloud Tasks:** Monthly questionnaire dispatch scheduling
+- [x] **Security Hardening:** CSRF tokens, security headers (X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy), SameSite cookies, restricted CORS, scrypt password hashing
+- [x] **Pagination:** skip/limit on all list endpoints (max 100)
+- [x] **Input Validation:** EmailStr, Field constraints, form validation on register
+- [x] **GCP Error Handling:** try/except with logging on all GCP wrapper calls
+- [x] **Alembic Migration:** Baseline migration for all 20 tables
+- [x] **Idempotent Seed:** Seed scripts check for existing data before inserting
+- [x] **CI Pipeline:** GitHub Actions for automated testing

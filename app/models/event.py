@@ -29,7 +29,7 @@ class Event(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     google_calendar_event_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     registrations: Mapped[list["EventRegistration"]] = relationship(
-        back_populates="event", lazy="selectin"
+        back_populates="event", lazy="selectin", cascade="all, delete-orphan"
     )
 
 

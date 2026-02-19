@@ -23,7 +23,7 @@ async def get_quiz_endpoint(
     return quiz
 
 
-@router.post("/{quiz_id}/submit", response_model=QuizAttemptResponse)
+@router.post("/{quiz_id}/submit", response_model=QuizAttemptResponse, status_code=201)
 async def submit_quiz(
     quiz_id: uuid.UUID,
     req: QuizSubmitRequest,

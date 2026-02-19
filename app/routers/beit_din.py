@@ -22,10 +22,14 @@ router = APIRouter(prefix="/beit-din", tags=["beit-din"])
 
 @router.get("/cases", response_model=list[CaseResponse])
 async def list_cases(
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(require_roles(UserRole.RABBI, UserRole.BEIT_DIN, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Case).order_by(Case.created_at.desc()))
+    result = await db.execute(
+        select(Case).order_by(Case.created_at.desc()).offset(skip).limit(min(limit, 100))
+    )
     return result.scalars().all()
 
 

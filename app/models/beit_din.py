@@ -23,8 +23,8 @@ class Case(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str] = mapped_column(Text, default="")
 
-    notes: Mapped[list["CaseNote"]] = relationship(back_populates="case", lazy="selectin")
-    documents: Mapped[list["CaseDocument"]] = relationship(back_populates="case", lazy="selectin")
+    notes: Mapped[list["CaseNote"]] = relationship(back_populates="case", lazy="selectin", cascade="all, delete-orphan")
+    documents: Mapped[list["CaseDocument"]] = relationship(back_populates="case", lazy="selectin", cascade="all, delete-orphan")
 
 
 class CaseNote(UUIDPrimaryKeyMixin, TimestampMixin, Base):

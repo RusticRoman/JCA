@@ -1,14 +1,14 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
-from app.models.assessment import QuizAttempt
+from app.models.assessment import Quiz, QuizAttempt
 from app.models.curriculum import Program, Semester, Subject, Video
 from app.models.progress import VideoProgress
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.dashboard import (
     DashboardResponse,
     QuizScoreSummary,
@@ -30,14 +30,15 @@ async def _build_dashboard(db: AsyncSession, user: User) -> DashboardResponse:
     )
     progress_map = {p.video_id: p for p in progress_result.scalars().all()}
 
-    # Get recent quiz attempts
+    # Get recent quiz attempts with quiz titles
     quiz_result = await db.execute(
-        select(QuizAttempt)
+        select(QuizAttempt, Quiz.title)
+        .join(Quiz, QuizAttempt.quiz_id == Quiz.id)
         .where(QuizAttempt.user_id == user.id)
         .order_by(QuizAttempt.created_at.desc())
         .limit(10)
     )
-    quiz_attempts = quiz_result.scalars().all()
+    quiz_rows = quiz_result.all()
 
     semesters_summary = []
     total_videos = 0
@@ -71,10 +72,10 @@ async def _build_dashboard(db: AsyncSession, user: User) -> DashboardResponse:
     overall_pct = (completed_videos / total_videos * 100) if total_videos > 0 else 0.0
 
     quiz_scores = []
-    for attempt in quiz_attempts:
+    for attempt, quiz_title in quiz_rows:
         quiz_scores.append(QuizScoreSummary(
             quiz_id=attempt.quiz_id,
-            quiz_title="",  # Would need join to get title
+            quiz_title=quiz_title,
             score=attempt.score,
             total_questions=attempt.total_questions,
             passed=attempt.passed,
@@ -104,9 +105,6 @@ async def get_student_dashboard(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.models.user import UserRole
-    from fastapi import HTTPException
-
     if current_user.role not in (UserRole.RABBI, UserRole.TEACHER, UserRole.ADMIN, UserRole.BEIT_DIN):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
@@ -114,5 +112,9 @@ async def get_student_dashboard(
     student = result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
+
+    # Mentors can only view their own assigned students
+    if current_user.role in (UserRole.RABBI, UserRole.TEACHER) and student.mentor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your assigned student")
 
     return await _build_dashboard(db, student)

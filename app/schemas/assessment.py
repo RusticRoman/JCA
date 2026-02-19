@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -27,7 +28,7 @@ class QuizResponse(BaseModel):
 
 class AnswerSubmission(BaseModel):
     question_id: uuid.UUID
-    selected_option: str
+    selected_option: Literal["A", "B", "C", "D"]
 
 
 class QuizSubmitRequest(BaseModel):

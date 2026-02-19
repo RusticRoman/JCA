@@ -14,11 +14,14 @@ router = APIRouter(prefix="/rabbi", tags=["rabbi"])
 
 @router.get("/students", response_model=list[UserResponse])
 async def list_students(
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(require_roles(UserRole.RABBI, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(User).where(User.role == UserRole.STUDENT, User.is_active == True)
+        select(User).where(User.role == UserRole.STUDENT, User.is_active.is_(True))
+        .offset(skip).limit(min(limit, 100))
     )
     return result.scalars().all()
 

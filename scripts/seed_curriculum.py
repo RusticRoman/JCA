@@ -1,6 +1,7 @@
 """Seed the database with 8 semesters x 5 subjects curriculum data."""
 import asyncio
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
@@ -72,6 +73,13 @@ async def seed():
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     async with session_factory() as session:
+        # Check if already seeded
+        existing = await session.execute(select(Program).where(Program.name == "Conversion Program"))
+        if existing.scalar_one_or_none():
+            print("Curriculum already seeded — skipping.")
+            await engine.dispose()
+            return
+
         program = Program(name="Conversion Program", description="Standard conversion curriculum", year=1)
         session.add(program)
         await session.flush()
@@ -96,7 +104,6 @@ async def seed():
                 session.add(subject)
                 await session.flush()
 
-                # Create a sample video for each subject
                 video = Video(
                     subject_id=subject.id,
                     title=f"{subj_name} - Lecture",
