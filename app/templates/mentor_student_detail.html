@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}{{ student.display_name }} - Mentor View{% endblock %}
+
+{% block head %}
+<style>
+    .page-wrapper {
+        max-width: 800px;
+    }
+
+    .logo-container h1 {
+        font-size: 1.25rem;
+    }
+
+    .logo-container svg {
+        width: 48px;
+        height: 48px;
+    }
+
+    .back-link {
+        display: inline-block;
+        font-size: 0.8125rem;
+        color: #6b6565;
+        text-decoration: none;
+        margin-bottom: 1rem;
+    }
+
+    .back-link:hover {
+        color: #252424;
+        text-decoration: underline;
+    }
+
+    .student-header {
+        background: #fff;
+        border: 1px solid #e0dcd5;
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .student-header .name {
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+
+    .student-header .detail-row {
+        display: flex;
+        gap: 1.5rem;
+        margin-top: 0.5rem;
+        font-size: 0.8125rem;
+        color: #6b6565;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+        background: #fff;
+        border: 1px solid #e0dcd5;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+    }
+
+    .stat-card .number {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #252424;
+        line-height: 1;
+    }
+
+    .stat-card .label {
+        font-size: 0.6875rem;
+        color: #6b6565;
+        margin-top: 0.25rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .progress-bar-wrapper {
+        background: #fff;
+        border: 1px solid #e0dcd5;
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .progress-bar-wrapper .bar-label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .progress-track {
+        background: #e8e4dc;
+        border-radius: 6px;
+        height: 12px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        background: #252424;
+        height: 100%;
+        border-radius: 6px;
+    }
+
+    .semester-section {
+        background: #fff;
+        border: 1px solid #e0dcd5;
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .semester-section h3 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e8e4dc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .semester-section h3 .sem-pct {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #6b6565;
+    }
+
+    .subject-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f0ece6;
+        font-size: 0.875rem;
+    }
+
+    .subject-row:last-child {
+        border-bottom: none;
+    }
+
+    .subject-name {
+        font-weight: 500;
+    }
+
+    .video-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .video-status .count {
+        font-size: 0.75rem;
+        color: #6b6565;
+    }
+
+    .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .dot-done { background: #16a34a; }
+    .dot-partial { background: #eab308; }
+    .dot-none { background: #d1ccc4; }
+
+    .activity-section {
+        background: #fff;
+        border: 1px solid #e0dcd5;
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .activity-section h3 {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e8e4dc;
+    }
+
+    .activity-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f0ece6;
+        font-size: 0.8125rem;
+    }
+
+    .activity-row:last-child {
+        border-bottom: none;
+    }
+
+    .activity-title {
+        font-weight: 500;
+    }
+
+    .activity-meta {
+        color: #6b6565;
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    .badge-live {
+        font-size: 0.6875rem;
+        background: #dbeafe;
+        color: #1e40af;
+        padding: 0.1rem 0.4rem;
+        border-radius: 3px;
+        font-weight: 600;
+    }
+
+    .badge-recorded {
+        font-size: 0.6875rem;
+        background: #f0ece6;
+        color: #5a5350;
+        padding: 0.1rem 0.4rem;
+        border-radius: 3px;
+        font-weight: 600;
+    }
+
+    .empty-state {
+        font-size: 0.875rem;
+        color: #6b6565;
+        text-align: center;
+        padding: 1rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<a class="back-link" href="/pages/mentor-dashboard">&larr; Back to my students</a>
+
+<div class="student-header">
+    <div class="name">{{ student.display_name }}</div>
+    <div class="detail-row">
+        <span>{{ student.email }}</span>
+        <span>Semester {{ student.enrollment_semester }}</span>
+        {% if student.hebrew_name %}
+        <span>Hebrew: {{ student.hebrew_name }}</span>
+        {% endif %}
+        <span>Joined {{ student.created_at.strftime('%b %d, %Y') }}</span>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="number">{{ videos_completed }}</div>
+        <div class="label">Completed</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ videos_in_progress }}</div>
+        <div class="label">In Progress</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ videos_total }}</div>
+        <div class="label">Total Videos</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ live_count }}</div>
+        <div class="label">Live Sessions</div>
+    </div>
+</div>
+
+<div class="progress-bar-wrapper">
+    <div class="bar-label">
+        <span>Overall Progress</span>
+        <span>{{ completion_pct }}%</span>
+    </div>
+    <div class="progress-track">
+        <div class="progress-fill" style="width: {{ completion_pct }}%"></div>
+    </div>
+</div>
+
+{% for semester in semesters %}
+<div class="semester-section">
+    <h3>
+        <span>{{ semester.name }}</span>
+        <span class="sem-pct">{{ semester.completed_videos }}/{{ semester.total_videos }} videos</span>
+    </h3>
+    {% for subject in semester.subjects %}
+    <div class="subject-row">
+        <span class="subject-name">{{ subject.name }}</span>
+        <div class="video-status">
+            {% for v in subject.videos %}
+                {% if v.status == 'completed' %}
+                <span class="dot dot-done" title="{{ v.title }} - completed"></span>
+                {% elif v.status == 'in_progress' %}
+                <span class="dot dot-partial" title="{{ v.title }} - in progress"></span>
+                {% else %}
+                <span class="dot dot-none" title="{{ v.title }} - not started"></span>
+                {% endif %}
+            {% endfor %}
+            <span class="count">{{ subject.completed }}/{{ subject.videos | length }}</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+
+{% if recent_activity %}
+<div class="activity-section">
+    <h3>Recent Activity</h3>
+    {% for act in recent_activity %}
+    <div class="activity-row">
+        <span class="activity-title">{{ act.video_title }}</span>
+        <div class="activity-meta">
+            {% if act.attendance_type == 'LIVE' %}
+            <span class="badge-live">LIVE</span>
+            {% else %}
+            <span class="badge-recorded">RECORDED</span>
+            {% endif %}
+            {% if act.is_completed %}
+            <span class="dot dot-done" title="completed"></span>
+            {% endif %}
+            <span>{{ act.updated_at.strftime('%b %d') }}</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
