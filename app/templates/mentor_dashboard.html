@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Mentor Dashboard - Jewish Conversion Academy{% endblock %}
+
+{% block head %}
+<style>
+    .page-wrapper {
+        max-width: 800px;
+    }
+
+    .logo-container h1 {
+        font-size: 1.25rem;
+    }
+
+    .logo-container svg {
+        width: 48px;
+        height: 48px;
+    }
+
+    .top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .top-bar .greeting {
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .top-bar .role-badge {
+        font-size: 0.75rem;
+        background: #d4c5a9;
+        color: #3d3520;
+        padding: 0.2rem 0.6rem;
+        border-radius: 4px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .top-bar a {
+        font-size: 0.8125rem;
+        color: #6b6565;
+        text-decoration: none;
+    }
+
+    .top-bar a:hover {
+        color: #252424;
+        text-decoration: underline;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .summary-card {
+        background: #fff;
+        border: 1px solid #e0dcd5;
+        border-radius: 8px;
+        padding: 1.25rem;
+        text-align: center;
+    }
+
+    .summary-card .number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #252424;
+        line-height: 1;
+    }
+
+    .summary-card .label {
+        font-size: 0.75rem;
+        color: #6b6565;
+        margin-top: 0.375rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .students-section {
+        background: #fff;
+        border: 1px solid #e0dcd5;
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .students-section h3 {
+        font-size: 1rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e8e4dc;
+    }
+
+    .student-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.875rem 0;
+        border-bottom: 1px solid #f0ece6;
+    }
+
+    .student-row:last-child {
+        border-bottom: none;
+    }
+
+    .student-info {
+        flex: 1;
+    }
+
+    .student-name {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: #252424;
+    }
+
+    .student-email {
+        font-size: 0.75rem;
+        color: #6b6565;
+        margin-top: 0.125rem;
+    }
+
+    .student-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .progress-mini {
+        width: 80px;
+        text-align: right;
+    }
+
+    .progress-mini .pct {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #252424;
+    }
+
+    .progress-mini-bar {
+        height: 6px;
+        background: #e8e4dc;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 0.25rem;
+    }
+
+    .progress-mini-fill {
+        height: 100%;
+        background: #252424;
+        border-radius: 3px;
+        transition: width 0.4s ease;
+    }
+
+    .semester-badge {
+        font-size: 0.6875rem;
+        background: #f0ece6;
+        color: #5a5350;
+        padding: 0.15rem 0.5rem;
+        border-radius: 3px;
+        white-space: nowrap;
+    }
+
+    .btn-view {
+        font-size: 0.8125rem;
+        color: #252424;
+        text-decoration: none;
+        font-weight: 600;
+        padding: 0.375rem 0.75rem;
+        border: 1px solid #d1ccc4;
+        border-radius: 5px;
+        transition: background 0.15s;
+    }
+
+    .btn-view:hover {
+        background: #f0ece6;
+    }
+
+    .empty-state {
+        font-size: 0.875rem;
+        color: #6b6565;
+        text-align: center;
+        padding: 2rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="top-bar">
+    <div>
+        <div class="greeting">Hello, {{ user.display_name }}</div>
+        <span class="role-badge">{{ user.role.value }}</span>
+    </div>
+    <a href="/pages/logout">Sign out</a>
+</div>
+
+<div class="summary-grid">
+    <div class="summary-card">
+        <div class="number">{{ students | length }}</div>
+        <div class="label">My Students</div>
+    </div>
+    <div class="summary-card">
+        <div class="number">{{ avg_completion }}%</div>
+        <div class="label">Avg Progress</div>
+    </div>
+    <div class="summary-card">
+        <div class="number">{{ total_completed }}</div>
+        <div class="label">Videos Done</div>
+    </div>
+</div>
+
+<div class="students-section">
+    <h3>Assigned Students</h3>
+    {% if students %}
+        {% for s in students %}
+        <div class="student-row">
+            <div class="student-info">
+                <div class="student-name">{{ s.display_name }}</div>
+                <div class="student-email">{{ s.email }}</div>
+            </div>
+            <div class="student-meta">
+                <span class="semester-badge">Sem {{ s.enrollment_semester }}</span>
+                <div class="progress-mini">
+                    <div class="pct">{{ s.completion_pct }}%</div>
+                    <div class="progress-mini-bar">
+                        <div class="progress-mini-fill" style="width: {{ s.completion_pct }}%"></div>
+                    </div>
+                </div>
+                <a class="btn-view" href="/pages/mentor/student/{{ s.id }}">View</a>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">No students assigned to you yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

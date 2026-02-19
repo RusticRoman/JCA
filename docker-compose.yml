@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jca
+      POSTGRES_PASSWORD: jca
+      POSTGRES_DB: jca
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jca"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://jca:jca@postgres:5432/jca
+      FIREBASE_PROJECT_ID: ""
+      FIREBASE_CREDENTIALS_PATH: ""
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:8000"]'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

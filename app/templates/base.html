@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Jewish Conversion Academy{% endblock %}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            background: #f8f6f1;
+            color: #252424;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .page-wrapper {
+            width: 100%;
+            max-width: 440px;
+            padding: 2rem 1.5rem;
+        }
+
+        .logo-container {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .logo-container svg {
+            width: 80px;
+            height: 80px;
+        }
+
+        .logo-container h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 0.75rem;
+            letter-spacing: 0.02em;
+            color: #252424;
+        }
+
+        .logo-container p {
+            font-size: 0.875rem;
+            color: #6b6565;
+            margin-top: 0.25rem;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #e0dcd5;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        }
+
+        .card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin-bottom: 0.375rem;
+            color: #454040;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.625rem 0.75rem;
+            border: 1px solid #d1ccc4;
+            border-radius: 6px;
+            font-size: 0.9375rem;
+            font-family: inherit;
+            background: #fcfbf9;
+            transition: border-color 0.15s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #8b7d6b;
+            box-shadow: 0 0 0 3px rgba(139, 125, 107, 0.12);
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            background: #252424;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9375rem;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+            margin-top: 1.5rem;
+        }
+
+        .btn:hover {
+            background: #3d3a3a;
+        }
+
+        .btn:active {
+            background: #1a1919;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 1.5rem 0;
+            color: #a09a92;
+            font-size: 0.8125rem;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e0dcd5;
+        }
+
+        .divider span {
+            padding: 0 0.75rem;
+        }
+
+        .btn-google {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            padding: 0.75rem;
+            background: #fff;
+            color: #252424;
+            border: 1px solid #d1ccc4;
+            border-radius: 6px;
+            font-size: 0.9375rem;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .btn-google:hover {
+            background: #f8f6f1;
+            border-color: #b5b0a8;
+        }
+
+        .btn-google svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .footer-link {
+            text-align: center;
+            margin-top: 1.25rem;
+            font-size: 0.875rem;
+            color: #6b6565;
+        }
+
+        .footer-link a {
+            color: #252424;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .footer-link a:hover {
+            text-decoration: underline;
+        }
+
+        .alert {
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        .page-footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.75rem;
+            color: #a09a92;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="page-wrapper">
+        <div class="logo-container">
+            <svg preserveAspectRatio="xMidYMid meet" viewBox="28.5 20 143 160" xmlns="http://www.w3.org/2000/svg">
+                <g>
+                    <path d="M165.965 39.255v-5.189h-4.584V20h-7.734v14.066h-4.584v5.189h-5.535v11.084c-.47-.188-.936-.377-1.401-.565-4.807-1.961-9.777-3.987-19.57-3.987-9.798 0-14.77 2.026-19.578 3.987-4.793 1.954-9.32 3.798-18.623 3.798-9.298 0-13.823-1.844-18.613-3.798-2.729-1.114-5.553-2.255-9.27-3.029v-7.49h-5.535v-5.189h-4.584V20H38.62v14.066h-4.584v5.189H28.5v122.898h5.535v4.715h4.584V180h7.734v-13.132h4.584v-4.715h5.535v-13.312c3.233.718 5.714 1.727 8.32 2.79 4.804 1.961 9.773 3.987 19.563 3.987 9.797 0 14.768-2.026 19.577-3.987 4.794-1.954 9.322-3.798 18.625-3.798 9.305 0 13.832 1.848 18.625 3.801.773.314 1.553.627 2.346.934v9.584h5.535v4.715h4.584V180h7.734v-13.132h4.584v-4.715h5.535V39.255h-5.535zM53.894 159.516h-5.535v4.715h-4.584v13.132h-2.578v-13.132h-4.584v-4.715h-5.535V41.892h5.535v-5.189h4.584V22.637h2.578v14.066h4.584v5.189h5.535v117.624zm88.243-10.333c-4.809-1.961-9.782-3.987-19.58-3.987s-14.77 2.026-19.578 3.987c-4.793 1.954-9.32 3.798-18.623 3.798-9.295 0-13.82-1.844-18.61-3.798-2.728-1.114-5.555-2.258-9.273-3.029V49.433c3.23.72 5.711 1.729 8.315 2.789 4.805 1.961 9.775 3.987 19.568 3.987 9.797 0 14.768-2.026 19.577-3.987 4.794-1.954 9.322-3.798 18.625-3.798 9.298 0 13.825 1.844 18.617 3.798.777.317 1.559.63 2.355.938v96.587c-.468-.187-.932-.375-1.393-.564zm26.785 10.333h-5.535v4.715h-4.584v13.132h-2.578v-13.132h-4.584v-4.715h-5.535V41.892h5.535v-5.189h4.584V22.637h2.578v14.066h4.584v5.189h5.535v117.624z" fill="#252424"></path>
+                </g>
+            </svg>
+            <h1>Jewish Conversion Academy</h1>
+            <p>Your path to knowledge and belonging</p>
+        </div>
+
+        {% block content %}{% endblock %}
+
+        <div class="page-footer">
+            Jewish Conversion Academy
+        </div>
+    </div>
+</body>
+</html>
