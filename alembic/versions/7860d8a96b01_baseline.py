@@ -23,10 +23,10 @@ def upgrade() -> None:
     op.create_table(
         'users',
         sa.Column('id', sa.Uuid(), primary_key=True),
-        sa.Column('firebase_uid', sa.String(128), unique=True, nullable=False),
+        sa.Column('firebase_uid', sa.String(512), unique=True, nullable=False),
         sa.Column('email', sa.String(255), unique=True, nullable=False),
         sa.Column('display_name', sa.String(255), server_default='', nullable=False),
-        sa.Column('role', sa.String(20), server_default='STUDENT', nullable=False),
+        sa.Column('role', sa.Enum('STUDENT', 'RABBI', 'TEACHER', 'BEIT_DIN', 'ADMIN', name='userrole', create_constraint=False), server_default='STUDENT', nullable=False),
         sa.Column('is_active', sa.Boolean(), server_default='true', nullable=False),
         sa.Column('hebrew_name', sa.String(255), nullable=True),
         sa.Column('enrollment_semester', sa.Integer(), server_default='1', nullable=False),
@@ -97,7 +97,7 @@ def upgrade() -> None:
         sa.Column('last_position_seconds', sa.Integer(), server_default='0', nullable=False),
         sa.Column('total_duration_seconds', sa.Integer(), server_default='0', nullable=False),
         sa.Column('is_completed', sa.Boolean(), server_default='false', nullable=False),
-        sa.Column('attendance_type', sa.String(20), server_default='RECORDED', nullable=False),
+        sa.Column('attendance_type', sa.Enum('LIVE', 'RECORDED', name='attendancetype', create_constraint=False), server_default='RECORDED', nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.UniqueConstraint('user_id', 'video_id', name='uq_user_video'),
@@ -163,7 +163,7 @@ def upgrade() -> None:
         sa.Column('id', sa.Uuid(), primary_key=True),
         sa.Column('student_id', sa.Uuid(), sa.ForeignKey('users.id'), nullable=False),
         sa.Column('rabbi_id', sa.Uuid(), sa.ForeignKey('users.id'), nullable=True),
-        sa.Column('status', sa.String(20), server_default='OPEN', nullable=False),
+        sa.Column('status', sa.Enum('OPEN', 'IN_REVIEW', 'SCHEDULED', 'COMPLETED', name='casestatus', create_constraint=False), server_default='OPEN', nullable=False),
         sa.Column('title', sa.String(255), nullable=False),
         sa.Column('description', sa.Text(), server_default='', nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -213,7 +213,7 @@ def upgrade() -> None:
         sa.Column('id', sa.Uuid(), primary_key=True),
         sa.Column('questionnaire_id', sa.Uuid(), sa.ForeignKey('monthly_questionnaires.id'), nullable=False),
         sa.Column('label', sa.String(500), nullable=False),
-        sa.Column('field_type', sa.String(20), server_default='TEXT', nullable=False),
+        sa.Column('field_type', sa.Enum('TEXT', 'TEXTAREA', 'SELECT', 'RATING', name='fieldtype', create_constraint=False), server_default='TEXT', nullable=False),
         sa.Column('options', sa.Text(), server_default='', nullable=False),
         sa.Column('order', sa.Integer(), server_default='0', nullable=False),
         sa.Column('required', sa.Boolean(), server_default='true', nullable=False),
@@ -264,7 +264,7 @@ def upgrade() -> None:
         sa.Column('id', sa.Uuid(), primary_key=True),
         sa.Column('title', sa.String(255), nullable=False),
         sa.Column('description', sa.Text(), server_default='', nullable=False),
-        sa.Column('event_type', sa.String(20), server_default='OTHER', nullable=False),
+        sa.Column('event_type', sa.Enum('RETREAT', 'SHABBATON', 'HOLIDAY', 'CLASS', 'OTHER', name='eventtype', create_constraint=False), server_default='OTHER', nullable=False),
         sa.Column('start_time', sa.DateTime(timezone=True), nullable=False),
         sa.Column('end_time', sa.DateTime(timezone=True), nullable=False),
         sa.Column('location', sa.String(255), server_default='', nullable=False),
@@ -307,3 +307,10 @@ def downgrade() -> None:
     op.drop_table('semesters')
     op.drop_table('programs')
     op.drop_table('users')
+
+    # Drop enum types
+    sa.Enum(name='eventtype').drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name='fieldtype').drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name='casestatus').drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name='attendancetype').drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name='userrole').drop(op.get_bind(), checkfirst=True)

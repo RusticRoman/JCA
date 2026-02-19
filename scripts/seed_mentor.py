@@ -15,7 +15,9 @@ from app.models.user import User, UserRole
 
 def _hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
-    hashed = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+    hashed = hashlib.scrypt(
+        password.encode(), salt=salt.encode(), n=16384, r=8, p=1, dklen=64
+    ).hex()
     return f"{salt}:{hashed}"
 
 
