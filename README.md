@@ -180,6 +180,55 @@ See [REFERENCE.md](REFERENCE.md) for the complete API reference.
 7. **Jewish Living & Ethics** — Tzedakah, Mitzvot, Mezuzah, Balance, Rituals
 8. **Identity & Completion** — Denominational, Israel, Antisemitism, Beit Din, Hebrew Names
 
+## GCP Deployment
+
+The app is deployed on Google Compute Engine for minimal cost and low CO2 emissions.
+
+### Infrastructure
+
+| Resource | Details |
+|----------|---------|
+| **GCP Project** | `rich-gift-487522-m6` |
+| **Region/Zone** | `us-central1-a` (Iowa — 97% Carbon Free Energy) |
+| **Instance** | `jca-server`, `e2-small` (2 shared vCPU, 2GB RAM, ~$12/mo) |
+| **OS** | Debian 12 with Docker CE |
+| **Container Registry** | Artifact Registry: `us-central1-docker.pkg.dev/rich-gift-487522-m6/jca/jca-app` |
+| **External IP** | `35.188.107.106` |
+| **Firewall** | `allow-http-jca` (TCP port 80) |
+
+### Architecture
+
+The VM runs two Docker containers via Docker Compose:
+- **postgres:16-alpine** — PostgreSQL database with persistent volume
+- **jca-app** — FastAPI application (port 80 → 8000)
+
+The startup script at `deploy/gce-startup.sh` installs Docker, pulls images from Artifact Registry, and starts the services.
+
+### Deploy Updates
+
+```bash
+# 1. Build and push new image (from project root, must target linux/amd64)
+docker buildx build --platform linux/amd64 \
+  -t us-central1-docker.pkg.dev/rich-gift-487522-m6/jca/jca-app:latest --push .
+
+# 2. SSH in and update containers
+gcloud compute ssh jca-server --zone=us-central1-a --project=rich-gift-487522-m6 \
+  --command="cd /opt/jca && sudo docker compose pull && sudo docker compose up -d --force-recreate"
+```
+
+### Monitoring
+
+```bash
+# Check container status
+gcloud compute ssh jca-server --zone=us-central1-a --command="sudo docker compose -f /opt/jca/docker-compose.yml ps"
+
+# View app logs
+gcloud compute ssh jca-server --zone=us-central1-a --command="sudo docker compose -f /opt/jca/docker-compose.yml logs app --tail 50"
+
+# Health check
+curl http://35.188.107.106/health
+```
+
 ## Testing
 
 ```bash

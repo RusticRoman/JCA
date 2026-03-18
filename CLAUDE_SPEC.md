@@ -300,3 +300,46 @@ Enforced via `require_roles()` FastAPI dependency factory in `app/auth/middlewar
 - [x] **Alembic Migration:** Baseline migration for all 20 tables
 - [x] **Idempotent Seed:** Seed scripts check for existing data before inserting
 - [x] **CI Pipeline:** GitHub Actions for automated testing
+- [x] **GCP Deployment:** GCE e2-small in us-central1-a (97% CFE), Docker Compose, Artifact Registry
+
+---
+
+## 8. Deployment
+
+### Infrastructure
+
+| Resource | Details |
+|----------|---------|
+| GCP Project | `rich-gift-487522-m6` |
+| Instance | `jca-server`, `e2-small` (2 shared vCPU, 2GB RAM, ~$12/mo) |
+| Region/Zone | `us-central1-a` (Iowa — 97% Carbon Free Energy) |
+| Container Registry | `us-central1-docker.pkg.dev/rich-gift-487522-m6/jca/jca-app` |
+| External IP | `35.188.107.106` (ephemeral) |
+| Firewall | `allow-http-jca` (TCP 80) |
+| OS | Debian 12 + Docker CE |
+
+### Containers (via Docker Compose at `/opt/jca/`)
+
+- **postgres:16-alpine** — Database with persistent volume
+- **jca-app** — FastAPI application (port 80 → 8000)
+
+### Seeded Credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| Rabbi | `mentor@jca.org` | `mentor123` |
+| Rabbi | `mentor2@jca.org` | `mentor456` |
+| Student (x10) | `anna.p@example.com`, etc. | `student123` |
+| Admin | (none seeded) | Register + update role in DB |
+
+### Deploy Updates
+
+```bash
+# Build for AMD64 and push
+docker buildx build --platform linux/amd64 \
+  -t us-central1-docker.pkg.dev/rich-gift-487522-m6/jca/jca-app:latest --push .
+
+# Update running containers
+gcloud compute ssh jca-server --zone=us-central1-a --project=rich-gift-487522-m6 \
+  --command="cd /opt/jca && sudo docker compose pull && sudo docker compose up -d --force-recreate"
+```

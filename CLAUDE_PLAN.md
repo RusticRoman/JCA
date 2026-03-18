@@ -239,6 +239,39 @@ This document records the implementation plan that was executed to build the JCA
 
 **Verification:** All 74 tests pass in 3.73s.
 
+### Step 14: GCP Deployment (2026-03-18)
+
+Deployed the application to Google Compute Engine with minimal cost and low CO2 emissions.
+
+**Infrastructure:**
+- GCP Project: `rich-gift-487522-m6`
+- Instance: `jca-server`, `e2-small` (2 shared vCPU, 2GB RAM, ~$12/mo)
+- Region: `us-central1-a` (Iowa — 97% Carbon Free Energy)
+- Container Registry: `us-central1-docker.pkg.dev/rich-gift-487522-m6/jca/jca-app`
+- External IP: `35.188.107.106`
+- Firewall: `allow-http-jca` (TCP 80)
+
+**Deployment artifacts:**
+- `deploy/gce-startup.sh` — VM startup script (installs Docker, pulls images, starts compose)
+- Production `docker-compose.yml` embedded in startup script at `/opt/jca/`
+- Images built for `linux/amd64` platform
+
+**Configuration:**
+- Running in dev mode (no Firebase credentials)
+- PostgreSQL 16 Alpine with persistent Docker volume
+- CORS set to `["*"]` (needs restriction for production)
+
+**Seeded credentials on deployed instance:**
+- `mentor@jca.org` / `mentor123` — Rabbi David Cohen (6 students)
+- `mentor2@jca.org` / `mentor456` — Rabbi Sarah Levy (4 students)
+- 10 students with password `student123` (e.g. `anna.p@example.com`)
+- No admin user seeded — register + update role in DB
+
+**New files created:**
+- `deploy/gce-startup.sh` — VM provisioning and container startup
+- `CLAUDE.md` — Project instructions for Claude Code
+- `SKILL.md` — Operations runbook (deploy, logs, DB access, etc.)
+
 ---
 
 ## Final Statistics

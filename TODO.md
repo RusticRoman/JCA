@@ -84,6 +84,21 @@ All unaddressed improvements identified across 3 audit rounds. Organized by prio
 
 ---
 
+## DEPLOYMENT (Completed 2026-03-18)
+
+- [x] **GCE deployment** — `e2-small` in `us-central1-a` (97% Carbon Free Energy), project `rich-gift-487522-m6`
+- [x] **Container registry** — Artifact Registry at `us-central1-docker.pkg.dev/rich-gift-487522-m6/jca/jca-app`
+- [x] **Startup script** — `deploy/gce-startup.sh` installs Docker, pulls images, starts services
+- [x] **Firewall rule** — `allow-http-jca` (TCP 80)
+- [ ] **HTTPS/TLS** — Currently HTTP only. Add Let's Encrypt or GCP load balancer with managed cert.
+- [ ] **Static IP** — Current IP is ephemeral. Reserve a static external IP.
+- [ ] **Domain name** — No custom domain configured yet.
+- [ ] **Production database credentials** — Using default `jca:jca` password. Set strong password via env vars.
+- [ ] **Firebase production credentials** — Running in dev mode. Configure real Firebase for production auth.
+- [ ] **Restrict CORS** — Currently `["*"]`. Set to actual domain once configured.
+
+---
+
 ## Stats
 
 | Severity | Count |
